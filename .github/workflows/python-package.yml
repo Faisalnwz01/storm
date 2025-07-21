@@ -14,6 +14,12 @@ jobs:
         uses: actions/setup-python@v3
         with:
           python-version: "3.11"
+      - name: Get version from setup.py
+        id: get_version
+        run: |
+          VERSION=$(grep -oP '(?<=version=\").*(?=\")' setup.py)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
       - name: Compare versions in setup.py and knowledge_storm/__init__.py
         run: |
           VERSION_SETUP=$(grep -oP '(?<=version=\").*(?=\")' setup.py)
@@ -33,33 +39,18 @@ jobs:
         run: python3 setup.py sdist bdist_wheel
       - name: Create GitHub release
         id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ github.run_number }}
-          release_name: Release v${{ github.run_number }}
+          tag_name: v${{ steps.get_version.outputs.version }}
+          name: Release v${{ steps.get_version.outputs.version }}
           body: |
-            Python package release v${{ github.run_number }}
+            Python package release v${{ steps.get_version.outputs.version }}
             
             Built from commit: ${{ github.sha }}
           draft: false
           prerelease: false
-      - name: Upload package to GitHub release
-        uses: actions/upload-release-asset@v1
+          files: |
+            dist/knowledge_storm-${{ steps.get_version.outputs.version }}-py3-none-any.whl
+            dist/knowledge_storm-${{ steps.get_version.outputs.version }}.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dist/*.whl
-          asset_name: knowledge_storm-${{ github.run_number }}-py3-none-any.whl
-          asset_content_type: application/octet-stream
-      - name: Upload source distribution to GitHub release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dist/*.tar.gz
-          asset_name: knowledge_storm-${{ github.run_number }}.tar.gz
-          asset_content_type: application/gzip
