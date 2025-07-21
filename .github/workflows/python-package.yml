@@ -1,4 +1,4 @@
-name: Build and upload Python package
+name: Build and upload Python package to GitHub releases
 
 on:
   workflow_dispatch:  # Allows manual triggering of the workflow
@@ -26,15 +26,40 @@ jobs:
           fi
         shell: bash
       - name: Install dependencies
-        run: python3 -m pip install setuptools wheel twine
-      - name: Install dependencies
         run: |
           python3 -m pip install --upgrade pip setuptools wheel
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-      - name: Build a binary wheel
+      - name: Build package
         run: python3 setup.py sdist bdist_wheel
-      - name: Publish package to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Create GitHub release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          user: __token__
-          password: ${{ secrets.PYPI_API_TOKEN }}
+          tag_name: v${{ github.run_number }}
+          release_name: Release v${{ github.run_number }}
+          body: |
+            Python package release v${{ github.run_number }}
+            
+            Built from commit: ${{ github.sha }}
+          draft: false
+          prerelease: false
+      - name: Upload package to GitHub release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/*.whl
+          asset_name: knowledge_storm-${{ github.run_number }}-py3-none-any.whl
+          asset_content_type: application/octet-stream
+      - name: Upload source distribution to GitHub release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/*.tar.gz
+          asset_name: knowledge_storm-${{ github.run_number }}.tar.gz
+          asset_content_type: application/gzip
